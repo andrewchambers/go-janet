@@ -1,5 +1,10 @@
 package janet
 
+import (
+	"strconv"
+	"unicode/utf8"
+)
+
 type JanetParserStatus int
 
 const (
@@ -360,7 +365,7 @@ func strEqBuf(str string, buf []byte) bool {
 	return true
 }
 
-func scanNumber(s string, out *double) bool {
+func scanNumber(s string, out *float64) bool {
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {
 		return false
@@ -392,7 +397,7 @@ func tokenchar(p *Parser, state *ParseState, c byte) int {
 	if p.buf[0] == ':' {
 		kwStr := p.buf[1:]
 		/* Don't do full utf-8 check unless we have seen non ascii characters. */
-		valid := (!state.argn) || utf8.Valid(kwStr)
+		valid := (state.argn == 0) || utf8.Valid(kwStr)
 		if !valid {
 			p.err = "invalid utf-8 in keyword"
 			return 0
@@ -413,7 +418,7 @@ func tokenchar(p *Parser, state *ParseState, c byte) int {
 		} else {
 			symStr := string(p.buf)
 			/* Don't do full utf-8 check unless we have seen non ascii characters. */
-			valid := (!state.argn) || utf8.ValidString(symStr)
+			valid := (state.argn == 0) || utf8.ValidString(symStr)
 			if !valid {
 				p.err = "invalid utf-8 in symbol"
 				return 0
@@ -422,7 +427,7 @@ func tokenchar(p *Parser, state *ParseState, c byte) int {
 		}
 	}
 	p.buf = p.buf[:0]
-	p.popState(p, ret)
+	p.popState(ret)
 	return 0
 }
 

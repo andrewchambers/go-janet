@@ -20,6 +20,7 @@ func JanetPanic(v interface{}) {
 type Symbol string
 type Keyword string
 type String string
+type Number float64
 
 const JANET_TUPLE_FLAG_BRACKETCTOR = 0x10000
 
