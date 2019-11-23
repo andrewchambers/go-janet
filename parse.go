@@ -346,8 +346,84 @@ func root(p *Parser, state *ParseState, c byte) int {
 	panic("unreachable")
 }
 
+func strEqBuf(str string, buf []byte) bool {
+	if len(str) != len(buf) {
+		return false
+	}
+
+	for i, b := range buf {
+		if str[i] != b {
+			return false
+		}
+	}
+
+	return true
+}
+
+func scanNumber(s string, out *double) bool {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return false
+	}
+	*out = v
+	return true
+}
+
 func tokenchar(p *Parser, state *ParseState, c byte) int {
-	panic("XXX")
+	var ret Value
+	var numval float64
+
+	if isSymbolChar(c) {
+		p.buf = append(p.buf, c)
+		if c > 127 {
+			state.argn = 1 /* Use to indicate non ascii */
+		}
+		return 1
+	}
+
+	if len(p.buf) == 0 {
+		p.err = "empty symbol invalid"
+		return 0
+	}
+
+	/* Token finished */
+	startDig := p.buf[0] >= '0' && p.buf[0] <= '9'
+	startNum := startDig || p.buf[0] == '-' || p.buf[0] == '+' || p.buf[0] == '.'
+	if p.buf[0] == ':' {
+		kwStr := p.buf[1:]
+		/* Don't do full utf-8 check unless we have seen non ascii characters. */
+		valid := (!state.argn) || utf8.Valid(kwStr)
+		if !valid {
+			p.err = "invalid utf-8 in keyword"
+			return 0
+		}
+		ret = Keyword(kwStr)
+	} else if startNum && !scanNumber(string(p.buf), &numval) {
+		ret = Number(numval)
+	} else if strEqBuf("nil", p.buf) {
+		ret = nil
+	} else if strEqBuf("false", p.buf) {
+		ret = false
+	} else if strEqBuf("true", p.buf) {
+		ret = true
+	} else {
+		if startDig {
+			p.err = "symbol literal cannot start with a digit"
+			return 0
+		} else {
+			symStr := string(p.buf)
+			/* Don't do full utf-8 check unless we have seen non ascii characters. */
+			valid := (!state.argn) || utf8.ValidString(symStr)
+			if !valid {
+				p.err = "invalid utf-8 in symbol"
+				return 0
+			}
+			ret = Symbol(symStr)
+		}
+	}
+	p.buf = p.buf[:0]
+	p.popState(p, ret)
+	return 0
 }
 
 func escapeh(p *Parser, state *ParseState, c byte) int {
