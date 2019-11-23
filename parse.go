@@ -408,9 +408,9 @@ func tokenchar(p *Parser, state *ParseState, c byte) int {
 	} else if strEqBuf("nil", p.buf) {
 		ret = nil
 	} else if strEqBuf("false", p.buf) {
-		ret = false
+		ret = Bool(false)
 	} else if strEqBuf("true", p.buf) {
-		ret = true
+		ret = Bool(true)
 	} else {
 		if startDig {
 			p.err = "symbol literal cannot start with a digit"
