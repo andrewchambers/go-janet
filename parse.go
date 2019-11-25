@@ -322,6 +322,8 @@ func strEqBuf(str string, buf []byte) bool {
 	return true
 }
 
+// XXX This will need to be ported from the original janet.
+// XXX avoiding casting to string will be more efficient.
 func scanNumber(s string, out *float64) bool {
 	v, err := strconv.ParseFloat(s, 64)
 	if err != nil {

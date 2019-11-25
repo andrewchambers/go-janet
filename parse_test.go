@@ -7,6 +7,10 @@ import (
 	"github.com/kr/pretty"
 )
 
+// Some simple tests and an entry point
+// that can be useful for manual debugging.
+// The parser itself will get more tests from
+// the main janet test suite.
 func TestParser(t *testing.T) {
 	type testCase struct {
 		Input      string
@@ -29,6 +33,7 @@ func TestParser(t *testing.T) {
 		{Input: "[1 :hello]", Expected: &Tuple{
 			Vals: []Value{Number(1), Keyword("hello")},
 		}},
+		{Input: "# a comment\ntrue", Expected: Bool(true)},
 	}
 
 	runTest := func(tc *testCase) {
