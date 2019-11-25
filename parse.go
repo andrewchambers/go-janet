@@ -128,19 +128,6 @@ func (parser *Parser) checkDead() {
 	}
 }
 
-func (parser *Parser) Init() {
-	parser.args = []Value{}
-	parser.states = []ParseState{}
-	parser.buf = []byte{}
-	parser.err = ""
-	parser.lookback = 0
-	parser.line = 1
-	parser.column = 0
-	parser.pending = 0
-	parser.flag = 0
-	parser.pushState(root, PFLAG_CONTAINER)
-}
-
 func (parser *Parser) pushState(consumer Consumer, flags int) {
 	state := ParseState{
 		counter:  0,
@@ -247,29 +234,6 @@ func (p *Parser) closeTable(state *ParseState) *Table {
 	panic("XXX")
 }
 
-func (parser *Parser) Consume(c byte) {
-	consumed := 0
-	parser.checkDead()
-	if c == '\r' {
-		parser.line += 1
-		parser.column = 0
-	} else if c == '\n' {
-		parser.column = 0
-		if parser.lookback != '\r' {
-			parser.line += 1
-		}
-	} else {
-		parser.column += 1
-	}
-
-	for consumed == 0 && parser.err == "" {
-		state := &parser.states[len(parser.states)-1]
-		consumed = state.consumer(parser, state, c)
-	}
-
-	parser.lookback = c
-}
-
 func root(p *Parser, state *ParseState, c byte) int {
 	switch c {
 	default:
@@ -282,11 +246,7 @@ func root(p *Parser, state *ParseState, c byte) int {
 		}
 		p.pushState(tokenchar, PFLAG_TOKEN)
 		return 0
-	case '\'':
-	case ',':
-	case ';':
-	case '~':
-	case '|':
+	case '\'', ',', ';', '~', '|':
 		p.pushState(root, PFLAG_READERMAC|int(c))
 		return 1
 	case '"':
@@ -301,9 +261,7 @@ func root(p *Parser, state *ParseState, c byte) int {
 	case '`':
 		p.pushState(longstring, PFLAG_LONGSTRING)
 		return 1
-	case ')':
-	case ']':
-	case '}':
+	case ')', ']', '}':
 		{
 			var ds Value
 			if len(p.states) == 1 {
@@ -348,7 +306,6 @@ func root(p *Parser, state *ParseState, c byte) int {
 		p.pushState(root, PFLAG_CONTAINER|PFLAG_CURLYBRACKETS)
 		return 1
 	}
-	panic("unreachable")
 }
 
 func strEqBuf(str string, buf []byte) bool {
@@ -386,11 +343,6 @@ func tokenchar(p *Parser, state *ParseState, c byte) int {
 		return 1
 	}
 
-	if len(p.buf) == 0 {
-		p.err = "empty symbol invalid"
-		return 0
-	}
-
 	/* Token finished */
 	startDig := p.buf[0] >= '0' && p.buf[0] <= '9'
 	startNum := startDig || p.buf[0] == '-' || p.buf[0] == '+' || p.buf[0] == '.'
@@ -403,7 +355,7 @@ func tokenchar(p *Parser, state *ParseState, c byte) int {
 			return 0
 		}
 		ret = Keyword(kwStr)
-	} else if startNum && !scanNumber(string(p.buf), &numval) {
+	} else if startNum && scanNumber(string(p.buf), &numval) {
 		ret = Number(numval)
 	} else if strEqBuf("nil", p.buf) {
 		ret = nil
@@ -583,4 +535,79 @@ func atsign(p *Parser, state *ParseState, c byte) int {
 	p.pushState(tokenchar, PFLAG_TOKEN)
 	p.buf = append(p.buf, '@')
 	return 0
+}
+
+// Public api
+
+func (parser *Parser) Init() {
+	parser.args = []Value{}
+	parser.states = []ParseState{}
+	parser.buf = []byte{}
+	parser.err = ""
+	parser.lookback = 0
+	parser.line = 1
+	parser.column = 0
+	parser.pending = 0
+	parser.flag = 0
+	parser.pushState(root, PFLAG_CONTAINER)
+}
+
+func (parser *Parser) Consume(c byte) {
+	consumed := 0
+	parser.checkDead()
+	if c == '\r' {
+		parser.line += 1
+		parser.column = 0
+	} else if c == '\n' {
+		parser.column = 0
+		if parser.lookback != '\r' {
+			parser.line += 1
+		}
+	} else {
+		parser.column += 1
+	}
+
+	for consumed == 0 && parser.err == "" {
+		state := &parser.states[len(parser.states)-1]
+		consumed = state.consumer(parser, state, c)
+	}
+
+	parser.lookback = c
+}
+
+func (parser *Parser) Produce() Value {
+	var ret Value
+	if parser.pending == 0 {
+		return nil
+	}
+
+	ret = parser.args[0]
+	for i := 1; i < len(parser.args); i += 1 {
+		parser.args[i-1] = parser.args[i]
+	}
+	parser.args = parser.args[:len(parser.args)-1]
+	parser.pending -= 1
+
+	return ret
+}
+
+func (parser *Parser) Clone() *Parser {
+	dest := &Parser{}
+	/* Misc fields */
+	dest.flag = parser.flag
+	dest.pending = parser.pending
+	dest.lookback = parser.lookback
+	dest.line = parser.line
+	dest.column = parser.column
+	dest.err = parser.err
+
+	/* Deep cloned fields */
+	dest.args = make([]Value, 0, len(parser.args))
+	dest.states = make([]ParseState, 0, len(parser.states))
+	dest.buf = make([]byte, 0, len(parser.buf))
+
+	dest.args = append(dest.args, parser.args...)
+	dest.states = append(dest.states, parser.states...)
+	dest.buf = append(dest.buf, parser.buf...)
+	return dest
 }

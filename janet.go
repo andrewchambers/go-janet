@@ -119,11 +119,48 @@ func NewBuffer(n int) *Buffer {
 }
 
 func Equal(x, y Value) (bool, error) {
+	if x == nil {
+		if y == nil {
+			return true, nil
+		} else {
+			return false, nil
+		}
+	}
+
 	switch x := x.(type) {
+	case Bool:
+		switch y := y.(type) {
+		case Bool:
+			return x == y, nil
+		default:
+			return false, nil
+		}
 	case Number:
 		switch y := y.(type) {
 		case Number:
 			return x == y, nil
+		default:
+			return false, nil
+		}
+	case *Tuple:
+		switch y := y.(type) {
+		case *Tuple:
+			if x == y {
+				return true, nil
+			}
+			if len(x.Vals) != len(y.Vals) {
+				return false, nil
+			}
+			for i, v := range x.Vals {
+				isEqual, err := Equal(v, y.Vals[i])
+				if err != nil {
+					return false, err
+				}
+				if !isEqual {
+					return false, nil
+				}
+			}
+			return true, nil
 		default:
 			return false, nil
 		}
@@ -137,6 +174,20 @@ func Equal(x, y Value) (bool, error) {
 	case String:
 		switch y := y.(type) {
 		case String:
+			return x == y, nil
+		default:
+			return false, nil
+		}
+	case Symbol:
+		switch y := y.(type) {
+		case Symbol:
+			return x == y, nil
+		default:
+			return false, nil
+		}
+	case Keyword:
+		switch y := y.(type) {
+		case Keyword:
 			return x == y, nil
 		default:
 			return false, nil
